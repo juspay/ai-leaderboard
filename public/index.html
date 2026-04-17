@@ -10,7 +10,51 @@
 
 <div class="refresh-bar"><div class="refresh-fill" id="refreshFill"></div></div>
 
-<div class="container">
+<style>
+/* Sidebar - fixed to left edge */
+.sidebar { position: fixed; left: 0; top: 0; width: 180px; height: 100vh; background: rgba(10,10,15,0.8); backdrop-filter: blur(8px); border-right: 1px solid var(--border); padding: 24px 16px; z-index: 100; display: flex; flex-direction: column; }
+.sidebar-menu { position: sticky; top: 24px; flex: 1; }
+.sidebar-title { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); margin-bottom: 12px; }
+.sidebar-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; color: var(--text-secondary); text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: all 0.2s; margin-bottom: 4px; }
+.sidebar-item:hover { background: var(--bg-card); color: var(--text-primary); }
+.sidebar-item.active { background: var(--bg-card); color: var(--accent-cyan); border: 1px solid rgba(14,165,233,0.3); }
+.sidebar-icon { font-size: 1rem; }
+/* User section in sidebar */
+.sidebar-user { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+.sidebar-user-email { font-size: 0.75rem; color: var(--text-dim); word-break: break-all; margin-bottom: 8px; }
+.sidebar-user-admin { font-size: 0.6rem; color: var(--accent-orange); text-transform: uppercase; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px; }
+.sidebar-logout { width: 100%; padding: 8px 12px; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+.sidebar-logout:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #ef4444; }
+@media (max-width: 768px) {
+  .sidebar { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 16px; }
+  .sidebar-menu { position: static; display: flex; gap: 8px; overflow-x: auto; }
+  .sidebar-item { white-space: nowrap; margin-bottom: 0; }
+  .sidebar-title { display: none; }
+  .sidebar-user { display: none; }
+}
+</style>
+
+<!-- Sidebar (outside container for full-left positioning) -->
+<aside class="sidebar">
+  <div class="sidebar-menu">
+    <div class="sidebar-title">Leaderboards</div>
+    <a href="/" class="sidebar-item active">
+      <span class="sidebar-icon">&#129302;</span>
+      <span>Claude Code</span>
+    </a>
+    <a href="/copilot.html" class="sidebar-item">
+      <span class="sidebar-icon">&#128640;</span>
+      <span>Copilot</span>
+    </a>
+  </div>
+  <div class="sidebar-user" id="sidebarUser" style="display:none;">
+    <div class="sidebar-user-email" id="sidebarEmail"></div>
+    <div class="sidebar-user-admin" id="sidebarAdmin" style="display:none;">Admin</div>
+    <button class="sidebar-logout" onclick="logout()">Logout</button>
+  </div>
+</aside>
+
+<div class="container" style="margin-left:300px;padding-left:0;padding-right: 0%;">
   <div class="header">
     <h1>CLAUDE USAGE LEADERBOARD</h1>
     <div class="subtitle">Maximize your GPU/AI usage. Every token counts.</div>
@@ -348,6 +392,42 @@
     </div>
   </div>
 </div>
+
+<script>
+// User info and logout for sidebar
+let currentUser = null;
+
+async function loadUser() {
+  try {
+    const res = await fetch(window.location.origin + '/api/me', { credentials: 'include' });
+    if (res.ok) {
+      currentUser = await res.json();
+      if (currentUser.email) {
+        document.getElementById('sidebarEmail').textContent = currentUser.email;
+        document.getElementById('sidebarUser').style.display = 'block';
+        if (currentUser.isAdmin) {
+          document.getElementById('sidebarAdmin').style.display = 'block';
+        }
+      }
+    }
+  } catch (e) {
+    // Silent fail
+  }
+}
+
+async function logout() {
+  try {
+    await fetch(window.location.origin + '/api/auth/logout', { method: 'POST', credentials: 'include' });
+  } catch (e) {
+    // Ignore errors
+  }
+  localStorage.removeItem('leaderboard_token');
+  window.location.href = '/setup.html';
+}
+
+// Load user info on page load
+loadUser();
+</script>
 
 <script src="/app.js"></script>
 </body>

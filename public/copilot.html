@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Copilot Analytics — Leaderboard</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .cp-header h1 {
+      background: linear-gradient(135deg, #0ea5e9, #06b6d4, #10b981);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .cp-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(14,165,233,0.1); border: 1px solid rgba(14,165,233,0.2);
+      color: #38bdf8; padding: 4px 14px; border-radius: 20px;
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 12px;
+    }
+    .cp-dot { width: 6px; height: 6px; background: #0ea5e9; border-radius: 50%; animation: livePulse 1.5s ease-in-out infinite; }
+
+    /* Sync section */
+    .filters-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .filters-grid .form-group { margin-bottom: 0; }
+    .sync-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .sync-result {
+      display: none; margin-top: 12px; padding: 10px 14px;
+      background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; line-height: 1.6;
+      color: var(--text-secondary); white-space: pre-wrap; max-height: 180px; overflow-y: auto;
+    }
+    .sync-result.visible { display: block; }
+    .sync-result.ok { border-color: rgba(34,197,94,0.3); color: var(--accent-green); }
+    .sync-result.err { border-color: rgba(239,68,68,0.3); color: #ef4444; }
+
+    /* User rows — 5-col layout mirrors leaderboard */
+    .cp-row {
+      grid-template-columns: 32px 1fr 80px 56px 72px !important;
+      cursor: pointer; align-items: center;
+    }
+    .cp-github-tag {
+      font-size: 0.62rem; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+      background: rgba(14,165,233,0.1); color: #38bdf8; border: 1px solid rgba(14,165,233,0.2);
+      font-family: 'JetBrains Mono', monospace; margin-right: 4px;
+    }
+    .cp-unlinked-tag {
+      font-size: 0.55rem; font-weight: 600; padding: 1px 5px; border-radius: 3px;
+      background: rgba(71,85,105,0.15); color: var(--text-dim); border: 1px solid var(--border);
+    }
+
+    /* Share + qty column */
+    .cp-info { text-align: right; }
+    .cp-share {
+      font-size: 0.82rem; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+      color: var(--text-secondary);
+    }
+    .cp-qty {
+      font-size: 0.6rem; font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim); margin-top: 2px;
+    }
+
+    /* Spend bar column - horizontal */
+    .cp-bar-col { padding: 0 4px; display: flex; align-items: center; }
+    .cp-spend-bar {
+      width: 100%; height: 6px; background: var(--bg-primary); border-radius: 3px;
+      overflow: hidden; position: relative;
+    }
+    .cp-spend-fill {
+      position: absolute; top: 0; bottom: 0; left: 0;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #0ea5e9, #10b981);
+      transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Amount column */
+    .cp-amount {
+      font-size: 1rem; font-weight: 800; font-family: 'JetBrains Mono', monospace;
+      color: var(--accent-cyan); text-align: right;
+    }
+    .cp-amount-sub {
+      font-size: 0.58rem; font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim); text-align: right; margin-top: 2px;
+    }
+
+    /* Tier badges — same pattern as rank-mythic etc */
+    .tier-power  { background: linear-gradient(135deg,rgba(239,68,68,.2),rgba(249,115,22,.2)); color:#ff6b6b; border:1px solid rgba(239,68,68,.4); text-shadow:0 0 6px rgba(239,68,68,.3); }
+    .tier-heavy  { background:rgba(249,115,22,.15); color:var(--accent-orange); border:1px solid rgba(249,115,22,.3); }
+    .tier-active { background:rgba(168,85,247,.15); color:var(--accent-purple); border:1px solid rgba(168,85,247,.3); }
+    .tier-light  { background:rgba(14,165,233,.12); color:#38bdf8; border:1px solid rgba(14,165,233,.25); }
+
+    /* Mobile: collapse to 3 cols */
+    @media (max-width: 768px) {
+      .cp-row { grid-template-columns: 28px 1fr 70px !important; }
+      .cp-info, .cp-bar-col { display: none; }
+    }
+
+    /* Link account form inside detail panel */
+    .link-form {
+      background: var(--bg-secondary); border: 1px solid rgba(168,85,247,0.2);
+      border-radius: 10px; padding: 14px 16px; margin-bottom: 4px;
+    }
+    .link-form-title {
+      font-size: 0.7rem; font-weight: 700; color: var(--accent-purple);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
+    }
+    .link-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .link-form-row select { flex: 1; min-width: 160px; }
+
+    /* Breakdown rows */
+    .breakdown-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+    .breakdown-row:last-child { border-bottom: none; }
+    .breakdown-label { flex: 1; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; color: var(--text-secondary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .breakdown-bar-track { width: 80px; height: 4px; background: var(--bg-primary); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+    .breakdown-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #0ea5e9, #10b981); transition: width 0.6s ease; }
+    .breakdown-amount { font-size: 0.8rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--text-primary); min-width: 64px; text-align: right; }
+
+    /* Sidebar - fixed to left edge */
+    .sidebar { position: fixed; left: 0; top: 0; width: 180px; height: 100vh; background: rgba(10,10,15,0.8); backdrop-filter: blur(8px); border-right: 1px solid var(--border); padding: 24px 16px; z-index: 100; display: flex; flex-direction: column; }
+    .sidebar-menu { position: sticky; top: 24px; flex: 1; }
+    .sidebar-title { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); margin-bottom: 12px; }
+    .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; color: var(--text-secondary); text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: all 0.2s; margin-bottom: 4px; }
+    .sidebar-item:hover { background: var(--bg-card); color: var(--text-primary); }
+    .sidebar-item.active { background: var(--bg-card); color: var(--accent-cyan); border: 1px solid rgba(14,165,233,0.3); }
+    .sidebar-icon { font-size: 1rem; }
+
+    /* User section in sidebar */
+    .sidebar-user { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+    .sidebar-user-email { font-size: 0.75rem; color: var(--text-dim); word-break: break-all; margin-bottom: 8px; }
+    .sidebar-user-admin { font-size: 0.6rem; color: var(--accent-orange); text-transform: uppercase; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px; }
+    .sidebar-logout { width: 100%; padding: 8px 12px; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+    .sidebar-logout:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #ef4444; }
+
+    @media (max-width: 768px) {
+      .sidebar { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 16px; }
+      .sidebar-menu { position: static; display: flex; gap: 8px; overflow-x: auto; }
+      .sidebar-item { white-space: nowrap; margin-bottom: 0; }
+      .sidebar-title { display: none; }
+      .sidebar-user { display: none; }
+    }
+
+    /* Period pills */
+    .period-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .period-pill { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
+    .period-pill-date { font-family: 'JetBrains Mono', monospace; color: var(--text-dim); font-size: 0.6rem; }
+    .period-pill-amount { font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); font-weight: 700; font-size: 0.78rem; }
+
+    /* Section cards */
+    .section-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+    .section-card .lb-section-title { margin-bottom: 12px; }
+    .breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+    /* Back nav */
+    .back-nav { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 0.78rem; font-weight: 500; text-decoration: none; transition: color 0.2s; margin-bottom: 16px; }
+    .back-nav:hover { color: var(--text-secondary); }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      .breakdown-grid { grid-template-columns: 1fr; }
+      .filters-grid { grid-template-columns: 1fr 1fr; }
+      .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 480px) {
+      .filters-grid { grid-template-columns: 1fr; }
+      .stats-bar { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="refresh-bar"><div class="refresh-fill" id="refreshFill"></div></div>
+
+<!-- Sidebar (outside container for full-left positioning) -->
+<aside class="sidebar">
+  <div class="sidebar-menu">
+    <div class="sidebar-title">Leaderboards</div>
+    <a href="/" class="sidebar-item">
+      <span class="sidebar-icon">&#129302;</span>
+      <span>Claude Code</span>
+    </a>
+    <a href="/copilot.html" class="sidebar-item active">
+      <span class="sidebar-icon">&#128640;</span>
+      <span>Copilot</span>
+    </a>
+  </div>
+  <div class="sidebar-user" id="sidebarUser" style="display:none;">
+    <div class="sidebar-user-email" id="sidebarEmail"></div>
+    <div class="sidebar-user-admin" id="sidebarAdmin" style="display:none;">Admin</div>
+    <button class="sidebar-logout" onclick="logout()">Logout</button>
+  </div>
+</aside>
+
+<div class="container" style="margin-left:300px;padding-left:0; width: 100%;">
+  <!-- Header -->
+  <div class="header cp-header">
+    <h1>COPILOT ANALYTICS</h1>
+    <div class="subtitle">GitHub Copilot billing usage across the organization</div>
+    <div class="cp-badge"><div class="cp-dot"></div>GITHUB COPILOT</div>
+    <div id="lastUpdatedTop" style="color:var(--text-dim);font-size:0.7rem;margin-top:8px;">Last updated: —</div>
+  </div>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-value blue" id="statRows">—</div>
+      <div class="stat-label">Usage Rows</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value green" id="statNetAmount">—</div>
+      <div class="stat-label">Gross Amount</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value orange" id="statNetQty">—</div>
+      <div class="stat-label">Net Quantity</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value purple" id="statUsers">—</div>
+      <div class="stat-label">Active Users</div>
+    </div>
+  </div>
+
+  <!-- Sync Section (collapsible, admin only) -->
+  <div class="setup-section" id="syncSection" style="display:none;">
+    <div class="setup-header" onclick="toggleSync()">
+      <h3>Sync From GitHub <span class="badge" id="syncBadge">Idle</span></h3>
+      <span class="setup-chevron">&#9660;</span>
+    </div>
+    <div class="setup-body">
+      <div class="setup-body-inner">
+        <div class="filters-grid">
+          <div class="form-group"><label>Organization</label><input type="text" id="scopeName" placeholder="juspay" value="juspay"></div>
+          <div class="form-group"><label>Year</label><input type="number" id="year" placeholder="2026"></div>
+          <div class="form-group"><label>Month</label><input type="number" id="month" placeholder="1" min="1" max="12"></div>
+          <div class="form-group"><label>Day</label><input type="number" id="day" placeholder="1" min="1" max="31"></div>
+          <div class="form-group"><label>GitHub User</label><input type="text" id="filterUser" placeholder="blank = all users"></div>
+          <div class="form-group"><label>Model Filter</label><input type="text" id="filterModel" placeholder="optional"></div>
+          <div class="form-group"><label>Product Filter</label><input type="text" id="filterProduct" placeholder="optional"></div>
+        </div>
+        <div class="sync-actions">
+          <button class="btn primary" id="syncBtn" onclick="syncNow()">Run Sync</button>
+          <button class="btn" onclick="refresh()">Refresh Data</button>
+          <button class="btn" id="autoLinkBtn" onclick="autoLinkNow()">Auto-link Users</button>
+        </div>
+        <div id="syncResult" class="sync-result"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Breakdowns Grid (moved to top) -->
+  <div class="breakdown-grid" id="topBreakdowns">
+    <div class="section-card">
+      <h3 class="lb-section-title">By Model</h3>
+      <div id="byModel"><div class="empty-state" style="padding:20px;"><p>Loading...</p></div></div>
+    </div>
+    <div class="section-card">
+      <h3 class="lb-section-title">By Product</h3>
+      <div id="byProduct"><div class="empty-state" style="padding:20px;"><p>Loading...</p></div></div>
+    </div>
+  </div>
+
+  <!-- Period -->
+  <div class="section-card" id="periodCard">
+    <h3 class="lb-section-title">Recent Periods</h3>
+    <div id="periodPills" class="period-pills">
+      <span style="color:var(--text-dim);font-size:0.78rem;">Loading...</span>
+    </div>
+  </div>
+
+  <!-- View Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="setViewTab('today', this)">Today</button>
+    <button class="tab" onclick="setViewTab('month', this)">This Month</button>
+    <button class="tab" onclick="setViewTab('all', this)">All Time</button>
+  </div>
+
+  <!-- Users Leaderboard (scrollable) -->
+  <div class="leaderboard-section">
+    <h3 class="lb-section-title">Copilot Usage by User</h3>
+    <div class="leaderboard" id="usersList" style="max-height:420px;overflow-y:auto;">
+      <div class="empty-state"><div class="icon">&#129302;</div><p>Loading...</p></div>
+    </div>
+  </div>
+
+  <div class="last-updated" id="lastUpdated">Last updated: —</div>
+</div>
+
+<!-- Detail Panel (slide-in, same pattern as leaderboard) -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-panel-header">
+    <div>
+      <div class="detail-user-name" id="detailName">—</div>
+      <div class="detail-user-meta" id="detailMeta"></div>
+    </div>
+    <button class="detail-panel-close" onclick="closeDetail()">&#10005; Close</button>
+  </div>
+  <div class="detail-body" id="detailBody">
+    <div class="empty-state"><p>Loading...</p></div>
+  </div>
+</div>
+
+<script>
+  const API = window.location.origin;
+  let activeTab = 'today';
+  let detailGithubUsername = null;
+  let detailLeaderboardName = null;
+  let currentUser = null; // { email, isAdmin }
+
+  function getTodayUtc() {
+    const now = new Date();
+    return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1, day: now.getUTCDate() };
+  }
+
+  function fmtAmount(n) {
+    const v = parseFloat(n) || 0;
+    if (v === 0) return '$0';
+    return '$' + (v >= 1000 ? (v / 1000).toFixed(2) + 'k' : v.toFixed(2));
+  }
+
+  function fmtQty(n) {
+    const v = parseFloat(n) || 0;
+    return v % 1 === 0 ? String(v) : v.toFixed(2);
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function toggleSync() {
+    document.getElementById('syncSection').classList.toggle('open');
+  }
+
+  function setViewTab(tab, btn) {
+    activeTab = tab;
+    document.querySelectorAll('.tabs .tab').forEach((t) => t.classList.remove('active'));
+    btn.classList.add('active');
+    refresh();
+  }
+
+  function buildParams(extra = {}) {
+    const today = getTodayUtc();
+    const params = {};
+    const scope = document.getElementById('scopeName').value.trim();
+    if (scope) params.scopeName = scope;
+    if (activeTab === 'today') {
+      params.year = today.year; params.month = today.month; params.day = today.day;
+    } else if (activeTab === 'month') {
+      params.year = today.year; params.month = today.month;
+    }
+    return Object.assign(params, extra);
+  }
+
+  function toQuery(params) {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== null && v !== '') q.set(k, String(v));
+    }
+    return q.toString();
+  }
+
+  function showToast(msg, ok = true) {
+    const old = document.querySelector('.toast');
+    if (old) old.remove();
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.style.borderColor = ok ? 'var(--accent-green)' : '#ef4444';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
+
+  // ============================================================
+  // Sync
+  // ============================================================
+
+  async function syncNow() {
+    const btn = document.getElementById('syncBtn');
+    const resultEl = document.getElementById('syncResult');
+    const badge = document.getElementById('syncBadge');
+
+    btn.disabled = true; btn.textContent = 'Syncing…';
+    badge.textContent = 'Running';
+    badge.style.cssText = 'background:rgba(245,158,11,0.15);color:var(--hs-color);border:1px solid rgba(245,158,11,0.3);';
+    resultEl.className = 'sync-result visible';
+    resultEl.textContent = 'Syncing from GitHub…';
+
+    const today = getTodayUtc();
+    const payload = {
+      scopeName: document.getElementById('scopeName').value.trim() || 'juspay',
+      scopeType: 'org',
+      year: parseInt(document.getElementById('year').value) || today.year,
+      month: parseInt(document.getElementById('month').value) || today.month,
+      day: parseInt(document.getElementById('day').value) || today.day,
+    };
+    const u = document.getElementById('filterUser').value.trim();
+    const m = document.getElementById('filterModel').value.trim();
+    const p = document.getElementById('filterProduct').value.trim();
+    if (u) payload.user = u;
+    if (m) payload.model = m;
+    if (p) payload.product = p;
+
+    try {
+      const res = await fetch(`${API}/api/copilot/sync`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        resultEl.className = 'sync-result visible err';
+        resultEl.textContent = body.error || 'Sync failed';
+        badge.textContent = 'Error';
+        badge.style.cssText = 'background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);';
+        showToast(body.error || 'Sync failed', false);
+      } else {
+        resultEl.className = 'sync-result visible ok';
+        resultEl.textContent = JSON.stringify(body, null, 2);
+        const count = body.upserted ?? body.fetched ?? 0;
+        badge.textContent = `+${count} rows`;
+        badge.style.cssText = 'background:rgba(34,197,94,0.15);color:var(--accent-green);border:1px solid rgba(34,197,94,0.3);';
+        showToast(`Sync complete — ${count} rows upserted`);
+        await refresh();
+      }
+    } catch (err) {
+      resultEl.className = 'sync-result visible err';
+      resultEl.textContent = err.message;
+      badge.textContent = 'Error';
+      badge.style.cssText = 'background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);';
+      showToast(err.message, false);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Run Sync';
+    }
+  }
+
+  // ============================================================
+  // Auto-link Users
+  // ============================================================
+
+  async function autoLinkNow() {
+    const btn = document.getElementById('autoLinkBtn');
+    const resultEl = document.getElementById('syncResult');
+
+    btn.disabled = true; btn.textContent = 'Linking…';
+    resultEl.className = 'sync-result visible';
+    resultEl.textContent = 'Running auto-link…';
+
+    try {
+      const res = await fetch(`${API}/api/copilot/auto-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ org: document.getElementById('scopeName').value.trim() || 'juspay' }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        resultEl.className = 'sync-result visible err';
+        resultEl.textContent = body.error || 'Auto-link failed';
+        showToast(body.error || 'Auto-link failed', false);
+      } else {
+        resultEl.className = 'sync-result visible ok';
+        resultEl.textContent = JSON.stringify(body, null, 2);
+        showToast(`Auto-link complete — ${body.linked} linked, ${body.skipped} skipped`);
+        await refresh();
+      }
+    } catch (err) {
+      resultEl.className = 'sync-result visible err';
+      resultEl.textContent = err.message;
+      showToast(err.message, false);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Auto-link Users';
+    }
+  }
+
+  // ============================================================
+  // Main refresh
+  // ============================================================
+
+  async function refresh() {
+    const q = toQuery(buildParams());
+    const [summaryRes, usersRes] = await Promise.all([
+      fetch(`${API}/api/copilot/summary?${q}`),
+      fetch(`${API}/api/copilot/users?${q}`),
+    ]);
+
+    if (!summaryRes.ok) {
+      const authErr = summaryRes.status === 401;
+      document.getElementById('usersList').innerHTML = `
+        <div class="empty-state">
+          <div class="icon">${authErr ? '&#128274;' : '&#9888;'}</div>
+          <p>${authErr
+            ? 'Not authenticated. <a href="/setup.html" style="color:var(--accent-blue)">Set up your account</a>.'
+            : 'Failed to load data.'}</p>
+        </div>`;
+      return;
+    }
+
+    const summary = await summaryRes.json();
+    const usersPayload = usersRes.ok ? await usersRes.json() : { users: [] };
+    const users = usersPayload.users || [];
+
+    renderStats(summary, users);
+    renderUsers(users);
+    renderBreakdowns(summary);
+    renderPeriods(summary.byPeriod || []);
+
+    const ts = new Date().toLocaleTimeString();
+    document.getElementById('lastUpdated').textContent = `Last updated: ${ts}`;
+    document.getElementById('lastUpdatedTop').textContent = `Last updated: ${ts}`;
+  }
+
+  // ============================================================
+  // Render helpers
+  // ============================================================
+
+  function renderStats(summary, users) {
+    const t = summary.totals || {};
+    document.getElementById('statRows').textContent = t.rows || 0;
+    document.getElementById('statNetAmount').textContent = fmtAmount(t.net_amount);
+    document.getElementById('statNetQty').textContent = fmtQty(t.net_quantity);
+    document.getElementById('statUsers').textContent = users.length;
+  }
+
+  function cpTier(sharePct) {
+    if (sharePct >= 20) return { cls: 'lb-rank-badge tier-power',  icon: '&#128293;', title: 'POWER' };
+    if (sharePct >= 10) return { cls: 'lb-rank-badge tier-heavy',  icon: '&#128081;', title: 'HEAVY' };
+    if (sharePct >= 4)  return { cls: 'lb-rank-badge tier-active', icon: '&#9889;',   title: 'ACTIVE' };
+    if (sharePct >= 1)  return { cls: 'lb-rank-badge tier-light',  icon: '&#11835;',  title: 'LIGHT' };
+    return null;
+  }
+
+  function timeAgo(iso) {
+    if (!iso) return null;
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1)  return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
+
+  function renderUsers(users) {
+    const el = document.getElementById('usersList');
+    if (!users.length) {
+      el.innerHTML = `<div class="empty-state"><div class="icon">&#129302;</div><p>No Copilot usage data for this period.</p></div>`;
+      return;
+    }
+
+    const totalAmount = users.reduce((s, u) => s + (parseFloat(u.net_amount) || 0), 0) || 0.01;
+    const maxAmount = Math.max(...users.map((u) => parseFloat(u.net_amount) || 0), 0.01);
+
+    el.innerHTML = users.map((u, i) => {
+      const rank = i + 1;
+      const rankClass = rank === 1 ? 'p1' : rank === 2 ? 'p2' : rank === 3 ? 'p3' : 'px';
+      const rowClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : '';
+      const rankLabel = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+
+      const amount = parseFloat(u.net_amount) || 0;
+      const qty = parseFloat(u.net_quantity) || 0;
+      const sharePct = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
+      const barPct = Math.round((amount / maxAmount) * 100);
+
+      const teamClass = (u.leaderboard_user_team || '').toLowerCase();
+      const tier = cpTier(sharePct);
+      const ago = timeAgo(u.last_fetched_at);
+
+      const nameSection = u.leaderboard_user_name
+        ? `<span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);">${escHtml(u.leaderboard_user_name)}</span>`
+        : '';
+
+      const metaSection = [
+        u.leaderboard_user_team
+          ? `<span class="lb-team-tag ${teamClass}">${escHtml(u.leaderboard_user_team)}</span>`
+          : `<span class="cp-unlinked-tag">Unlinked</span>`,
+        tier ? `<span class="${tier.cls}">${tier.icon} ${tier.title}</span>` : '',
+        ago ? `<span class="lb-updated">synced ${ago}</span>` : '',
+      ].filter(Boolean).join('');
+
+      const safeUser = escHtml(u.github_username || '');
+      const safeName = escHtml(u.leaderboard_user_name || '');
+      const safeTeam = escHtml(u.leaderboard_user_team || '');
+
+      return `<div class="lb-row cp-row ${rowClass}" style="animation-delay:${i * 0.04}s"
+                   onclick="openDetail('${safeUser}','${safeName}','${safeTeam}')">
+        <div class="lb-position ${rankClass}">${rankLabel}</div>
+
+        <div class="lb-user-info">
+          <div class="lb-name">
+            <span class="cp-github-tag">${safeUser || '—'}</span>${nameSection}
+          </div>
+          <div class="lb-meta">${metaSection}</div>
+        </div>
+
+        <div class="cp-info">
+          <div class="cp-share">${sharePct >= 0.1 ? sharePct.toFixed(1) + '%' : '<1%'}</div>
+          <div class="cp-qty">qty ${fmtQty(qty)}</div>
+        </div>
+
+        <div class="cp-bar-col">
+          <div class="cp-spend-bar">
+            <div class="cp-spend-fill" style="width:${barPct}%"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="cp-amount">${fmtAmount(amount)}</div>
+          <div class="cp-amount-sub">gross</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderBreakdownRows(rows, key) {
+    if (!rows.length) return `<div class="empty-state" style="padding:20px;"><p>No data for this period.</p></div>`;
+    const max = Math.max(...rows.map((r) => parseFloat(r.net_amount) || 0), 0.01);
+    return rows.slice(0, 8).map((r) => {
+      const amount = parseFloat(r.net_amount) || 0;
+      const label = r[key] || '(unknown)';
+      const pct = Math.round((amount / max) * 100);
+      return `<div class="breakdown-row">
+        <span class="breakdown-label" title="${escHtml(label)}">${escHtml(label)}</span>
+        <div class="breakdown-bar-track"><div class="breakdown-bar-fill" style="width:${pct}%"></div></div>
+        <span class="breakdown-amount">${fmtAmount(amount)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderBreakdowns(summary) {
+    document.getElementById('byModel').innerHTML = renderBreakdownRows(summary.byModel || [], 'model');
+    document.getElementById('byProduct').innerHTML = renderBreakdownRows(summary.byProduct || [], 'product');
+  }
+
+  function renderPeriods(periods) {
+    const el = document.getElementById('periodPills');
+    if (!periods.length) {
+      el.innerHTML = `<span style="color:var(--text-dim);font-size:0.78rem;">No period data yet. Run a sync first.</span>`;
+      return;
+    }
+    el.innerHTML = periods.slice(0, 14).map((p) => {
+      const amount = parseFloat(p.net_amount) || 0;
+      return `<div class="period-pill">
+        <span class="period-pill-date">${p.period_year}-${String(p.period_month).padStart(2,'0')}-${String(p.period_day).padStart(2,'0')}</span>
+        <span class="period-pill-amount">${fmtAmount(amount)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ============================================================
+  // Detail panel
+  // ============================================================
+
+  function openDetail(githubUsername, leaderboardName, leaderboardTeam) {
+    detailGithubUsername = githubUsername;
+    detailLeaderboardName = leaderboardName;
+
+    const panel = document.getElementById('detailPanel');
+    const overlay = document.getElementById('detailOverlay');
+    const body = document.getElementById('detailBody');
+
+    document.getElementById('detailName').textContent = githubUsername || '—';
+
+    const teamClass = (leaderboardTeam || '').toLowerCase();
+    document.getElementById('detailMeta').innerHTML = leaderboardName
+      ? `<span class="cp-github-tag">GitHub</span>
+         <span class="lb-team-tag ${teamClass}">${escHtml(leaderboardTeam)}</span>
+         <span style="font-size:0.8rem;color:var(--text-secondary);">${escHtml(leaderboardName)}</span>`
+      : `<span class="cp-github-tag">GitHub</span><span class="cp-unlinked-tag">Unlinked</span>`;
+
+    panel.classList.add('open');
+    overlay.classList.add('open');
+    body.innerHTML = '<div class="empty-state"><p>Loading...</p></div>';
+
+    loadUserDetail(githubUsername, leaderboardName, body);
+  }
+
+  function closeDetail() {
+    document.getElementById('detailPanel').classList.remove('open');
+    document.getElementById('detailOverlay').classList.remove('open');
+  }
+
+  async function submitLink() {
+    const select = document.getElementById('linkUserSelect');
+    const resultEl = document.getElementById('linkResult');
+    const leaderboardUserId = select ? select.value : '';
+
+    if (!leaderboardUserId) {
+      resultEl.style.display = 'block';
+      resultEl.style.color = '#ef4444';
+      resultEl.textContent = 'Please select a leaderboard user.';
+      return;
+    }
+
+    resultEl.style.display = 'block';
+    resultEl.style.color = 'var(--text-dim)';
+    resultEl.textContent = 'Linking…';
+
+    try {
+      const res = await fetch(`${API}/api/copilot/identity/${encodeURIComponent(leaderboardUserId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ githubUsername: detailGithubUsername }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        resultEl.style.color = '#ef4444';
+        resultEl.textContent = data.error || 'Link failed.';
+      } else {
+        resultEl.style.color = 'var(--accent-green)';
+        resultEl.textContent = 'Linked! Refreshing…';
+        showToast(`Linked ${detailGithubUsername} to leaderboard user`);
+        // Refresh main list and reopen the detail with the new name
+        await refresh();
+        // Re-open detail with updated info (name comes from the option label)
+        const selectedOption = select.options[select.selectedIndex];
+        const newName = selectedOption ? selectedOption.textContent.split(' (')[0] : '';
+        openDetail(detailGithubUsername, newName, data.mapping?.external_org || '');
+      }
+    } catch (err) {
+      resultEl.style.color = '#ef4444';
+      resultEl.textContent = err.message;
+    }
+  }
+
+  async function loadUserDetail(githubUsername, leaderboardName, body) {
+    const viewParams = buildParams({ githubUsername });
+    const allParams = { githubUsername, scopeName: document.getElementById('scopeName').value.trim() || undefined };
+
+    const fetchAll = [
+      fetch(`${API}/api/copilot/summary?${toQuery(viewParams)}`),
+      fetch(`${API}/api/copilot/summary?${toQuery(allParams)}`),
+    ];
+    // If unlinked, also fetch leaderboard users for the link form
+    if (!leaderboardName) fetchAll.push(fetch(`${API}/api/users`));
+
+    const [viewRes, allRes, usersRes] = await Promise.all(fetchAll);
+
+    if (!viewRes.ok) {
+      body.innerHTML = '<div class="empty-state"><p>Failed to load user data.</p></div>';
+      return;
+    }
+
+    const view = await viewRes.json();
+    const all = allRes.ok ? await allRes.json() : view;
+    const lbUsers = (usersRes && usersRes.ok) ? await usersRes.json() : null;
+
+    renderDetailBody(body, githubUsername, leaderboardName, view, all, lbUsers);
+  }
+
+  function renderDetailBody(body, githubUsername, leaderboardName, view, all, lbUsers) {
+    const vt = view.totals || {};
+    const at = all.totals || {};
+
+    // Compute derived stats from all-time byPeriod
+    const allPeriods = (all.byPeriod || []).map((p) => ({ ...p, amount: parseFloat(p.net_amount) || 0 }));
+    const activeDays = allPeriods.filter((p) => p.amount > 0).length;
+    const peakPeriod = allPeriods.reduce((best, p) => (!best || p.amount > best.amount ? p : best), null);
+    const totalAmount = parseFloat(at.net_amount) || 0;
+    const avgDaily = activeDays > 0 ? totalAmount / activeDays : 0;
+
+    // View-period stats
+    const viewAmount = parseFloat(vt.net_amount) || 0;
+    const viewQty = parseFloat(vt.net_quantity) || 0;
+    const viewRows = vt.rows || 0;
+
+    const tabLabel = activeTab === 'today' ? 'Today' : activeTab === 'month' ? 'This Month' : 'All Time';
+
+    let html = '';
+
+    // ── Link account form (shown when unlinked) ──────────────
+    if (!leaderboardName) {
+      let formContent;
+      if (!lbUsers) {
+        formContent = `<p style="font-size:0.78rem;color:#ef4444;">Could not load leaderboard users. Check auth.</p>`;
+      } else if (!lbUsers.length) {
+        formContent = `<p style="font-size:0.78rem;color:var(--text-secondary);">
+          No leaderboard users found. Add users on the
+          <a href="/" style="color:var(--accent-blue)">main leaderboard</a> first, then come back to link.
+        </p>`;
+      } else {
+        const options = lbUsers
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((u) => `<option value="${escHtml(u.id)}">${escHtml(u.name)} (${escHtml(u.team)})</option>`)
+          .join('');
+        formContent = `
+          <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:10px;">
+            Associate <strong style="color:#38bdf8">${escHtml(githubUsername)}</strong> with a leaderboard account
+            so their Copilot spend shows on the team dashboard.
+          </p>
+          <div class="link-form-row">
+            <select id="linkUserSelect" style="flex:1;min-width:160px;">
+              <option value="">— select leaderboard user —</option>
+              ${options}
+            </select>
+            <button class="btn primary" onclick="submitLink()">Link</button>
+          </div>
+          <div id="linkResult" style="margin-top:8px;font-size:0.75rem;display:none;"></div>`;
+      }
+      html += `<div class="detail-section">
+        <div class="link-form">
+          <div class="link-form-title">&#128279; Link to Leaderboard User</div>
+          ${formContent}
+        </div>
+      </div>`;
+    }
+
+    // ── Stats: current view ──────────────────────────────────
+    html += `<div class="detail-section">
+      <div class="detail-section-title">${escHtml(tabLabel)}</div>
+      <div class="detail-stats-grid">
+        <div class="detail-stat">
+          <div class="detail-stat-value" style="color:var(--accent-cyan)">${fmtAmount(viewAmount)}</div>
+          <div class="detail-stat-label">Gross Amount</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-value" style="color:var(--accent-blue)">${fmtQty(viewQty)}</div>
+          <div class="detail-stat-label">Quantity</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-value" style="color:var(--text-secondary)">${viewRows}</div>
+          <div class="detail-stat-label">Rows</div>
+        </div>
+      </div>
+    </div>`;
+
+    // ── Stats: all-time summary ──────────────────────────────
+    html += `<div class="detail-section">
+      <div class="detail-section-title">All-Time Summary</div>
+      <div class="detail-stats-grid">
+        <div class="detail-stat">
+          <div class="detail-stat-value" style="color:var(--accent-green)">${fmtAmount(totalAmount)}</div>
+          <div class="detail-stat-label">Total Gross</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-value" style="color:var(--accent-orange)">${fmtAmount(avgDaily)}</div>
+          <div class="detail-stat-label">Avg / Day</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-value" style="color:var(--accent-purple)">${activeDays}</div>
+          <div class="detail-stat-label">Active Days</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-value" style="color:var(--accent-cyan)">${peakPeriod ? fmtAmount(peakPeriod.amount) : '—'}</div>
+          <div class="detail-stat-label">Peak Day</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-value" style="color:var(--text-secondary)">${fmtQty(at.net_quantity)}</div>
+          <div class="detail-stat-label">Total Qty</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-value" style="color:var(--text-secondary)">${at.rows || 0}</div>
+          <div class="detail-stat-label">Total Rows</div>
+        </div>
+      </div>
+    </div>`;
+
+    // ── Daily spend chart ────────────────────────────────────
+    if (allPeriods.length > 0) {
+      html += `<div class="detail-section">
+        <div class="detail-section-title">Daily Spend Trend</div>
+        <div class="detail-chart-container">${renderSpendChart(allPeriods)}</div>
+      </div>`;
+    }
+
+    // ── By Model ─────────────────────────────────────────────
+    const models = all.byModel || [];
+    if (models.length) {
+      html += `<div class="detail-section">
+        <div class="detail-section-title">Spend by Model</div>
+        ${renderBreakdownRows(models, 'model')}
+      </div>`;
+    }
+
+    // ── By Product ───────────────────────────────────────────
+    const products = all.byProduct || [];
+    if (products.length) {
+      html += `<div class="detail-section">
+        <div class="detail-section-title">Spend by Product</div>
+        ${renderBreakdownRows(products, 'product')}
+      </div>`;
+    }
+
+    // ── Period log table ─────────────────────────────────────
+    if (allPeriods.length) {
+      const sorted = [...allPeriods].sort((a, b) => {
+        const da = a.period_year * 10000 + a.period_month * 100 + (a.period_day || 0);
+        const db = b.period_year * 10000 + b.period_month * 100 + (b.period_day || 0);
+        return db - da;
+      });
+      html += `<div class="detail-section">
+        <div class="detail-section-title">Period Log</div>
+        <div class="detail-table-wrap">
+          <table class="detail-table">
+            <thead><tr>
+              <th>Date</th><th>Net Amount</th><th>Net Qty</th>
+            </tr></thead>
+            <tbody>
+              ${sorted.map((p) => `<tr>
+                <td>${p.period_year}-${String(p.period_month).padStart(2,'0')}-${String(p.period_day||0).padStart(2,'0')}</td>
+                <td style="color:var(--accent-cyan)">${fmtAmount(p.amount)}</td>
+                <td>${fmtQty(p.net_quantity)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }
+
+    body.innerHTML = html || '<div class="empty-state"><p>No data available.</p></div>';
+  }
+
+  // ============================================================
+  // Daily spend line chart (SVG)
+  // ============================================================
+
+  function renderSpendChart(periods) {
+    const sorted = [...periods]
+      .filter((p) => p.period_day > 0)  // only day-level rows
+      .sort((a, b) => {
+        const da = a.period_year * 10000 + a.period_month * 100 + a.period_day;
+        const db = b.period_year * 10000 + b.period_month * 100 + b.period_day;
+        return da - db;
+      });
+
+    if (sorted.length < 2) {
+      // Single point — just show it as a stat, no chart needed
+      return `<div style="text-align:center;padding:16px;color:var(--text-dim);font-size:0.8rem;">
+        Only one data point — ${fmtAmount(sorted[0]?.amount || 0)} on
+        ${sorted[0] ? `${sorted[0].period_year}-${String(sorted[0].period_month).padStart(2,'0')}-${String(sorted[0].period_day).padStart(2,'0')}` : '—'}
+      </div>`;
+    }
+
+    const W = 440, H = 120;
+    const padL = 4, padR = 4, padT = 14, padB = 6;
+    const cw = W - padL - padR, ch = H - padT - padB;
+
+    const values = sorted.map((p) => p.amount);
+    const maxVal = Math.max(...values, 0.01);
+    const n = sorted.length;
+
+    const coords = sorted.map((p, i) => {
+      const x = padL + (i / (n - 1)) * cw;
+      const y = padT + (1 - p.amount / maxVal) * ch;
+      return { x, y, p };
+    });
+
+    const pts = coords.map(({ x, y }) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+
+    let svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" style="font-family:'JetBrains Mono',monospace;display:block;">
+      <polyline points="${pts}" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+
+    // Max label
+    if (maxVal > 0) {
+      const peak = coords.reduce((b, c) => (c.p.amount > b.p.amount ? c : b));
+      svg += `<text x="${peak.x.toFixed(1)}" y="${(peak.y - 5).toFixed(1)}" text-anchor="middle"
+        font-size="8" fill="#0ea5e9" opacity="0.9">${fmtAmount(peak.p.amount)}</text>`;
+    }
+
+    // Dots (only show if not too many)
+    if (n <= 20) {
+      coords.forEach(({ x, y, p }) => {
+        const dateStr = `${p.period_year}-${String(p.period_month).padStart(2,'0')}-${String(p.period_day).padStart(2,'0')}`;
+        svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5"
+          fill="#0ea5e9" stroke="var(--bg-card)" stroke-width="1.5">
+          <title>${dateStr}: ${fmtAmount(p.amount)}</title>
+        </circle>`;
+      });
+    }
+
+    // X-axis date labels (first, mid, last)
+    const labelIdxs = [0, Math.floor((n-1)/2), n-1].filter((v, i, a) => a.indexOf(v) === i);
+    labelIdxs.forEach((idx) => {
+      const { x, p } = coords[idx];
+      const label = `${p.period_month}/${p.period_day}`;
+      svg += `<text x="${x.toFixed(1)}" y="${(padT + ch + 12).toFixed(1)}" text-anchor="middle"
+        font-size="8" fill="#475569">${label}</text>`;
+    });
+
+    svg += '</svg>';
+    return svg;
+  }
+
+  // ============================================================
+  // User info and logout
+  // ============================================================
+
+  async function loadUser() {
+    try {
+      const res = await fetch(`${API}/api/me`, { credentials: 'include' });
+      if (res.ok) {
+        currentUser = await res.json();
+        if (currentUser.email) {
+          document.getElementById('sidebarEmail').textContent = currentUser.email;
+          document.getElementById('sidebarUser').style.display = 'block';
+          if (currentUser.isAdmin) {
+            document.getElementById('sidebarAdmin').style.display = 'block';
+          }
+        }
+      }
+    } catch (e) {
+      // Silent fail - user not logged in
+    }
+  }
+
+  async function logout() {
+    try {
+      await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+    } catch (e) {
+      // Ignore errors
+    }
+    // Clear stored tokens and redirect
+    localStorage.removeItem('leaderboard_token');
+    window.location.href = '/setup.html';
+  }
+
+  // ============================================================
+  // Init
+  // ============================================================
+
+  (async function init() {
+    const today = getTodayUtc();
+    document.getElementById('year').value = today.year;
+    document.getElementById('month').value = today.month;
+    document.getElementById('day').value = today.day;
+    await loadUser();
+    // Show sync section only for admins
+    if (currentUser?.isAdmin) {
+      document.getElementById('syncSection').style.display = 'block';
+    }
+    refresh();
+  })();
+</script>
+</body>
+</html>

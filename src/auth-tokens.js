@@ -25,7 +25,7 @@ export function createAuthManager(pool) {
     /** Get token record by token string */
     async getByToken(token) {
       const { rows } = await pool.query(
-        'SELECT token, email, user_id FROM auth_tokens WHERE token = $1',
+        'SELECT token, email, user_id, is_admin FROM auth_tokens WHERE token = $1',
         [token]
       );
       return rows[0] || null;
@@ -70,6 +70,23 @@ export function createAuthManager(pool) {
         'SELECT user_id FROM auth_tokens WHERE user_id IS NOT NULL'
       );
       return new Set(rows.map(r => r.user_id));
+    },
+
+    /** Check if a token belongs to an admin */
+    async isAdmin(token) {
+      const { rows } = await pool.query(
+        'SELECT is_admin FROM auth_tokens WHERE token = $1',
+        [token]
+      );
+      return rows.length > 0 && rows[0].is_admin === true;
+    },
+
+    /** Grant/revoke admin privileges (for bootstrap/admin management) */
+    async setAdmin(email, isAdmin) {
+      await pool.query(
+        'UPDATE auth_tokens SET is_admin = $1 WHERE email = LOWER($2)',
+        [isAdmin, email]
+      );
     },
   };
 }

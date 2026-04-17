@@ -8,3 +8,6 @@ data:
   DATABASE_URL: "postgresql://leaderboard:leaderboard-db-pass-2026@postgres.atlas-ai.svc.cluster.local:5432/ai_leaderboard"
   PLAN_COST: "200"
   CF_ACCESS_AUD: ""
+  COPILOT_SCOPE_NAME: "juspay"
+  COPILOT_EXPAND_ORG_USERS: "true"
+  COPILOT_CONCURRENCY: "4"

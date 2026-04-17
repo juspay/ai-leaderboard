@@ -7,6 +7,12 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://leaderboard:leaderboard@postgres:5432/ai_leaderboard
       - PLAN_COST=200
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - COPILOT_SCOPE_NAME=${COPILOT_SCOPE_NAME:-juspay}
+      - COPILOT_EXPAND_ORG_USERS=${COPILOT_EXPAND_ORG_USERS:-true}
+      - COPILOT_CONCURRENCY=${COPILOT_CONCURRENCY:-4}
+      - COPILOT_SYNC_TOKEN=${COPILOT_SYNC_TOKEN:-
+      }
     depends_on:
       postgres:
         condition: service_healthy
