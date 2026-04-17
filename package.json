@@ -14,6 +14,7 @@
     "deploy": "wrangler deploy",
     "deploy:cf": "wrangler deploy",
     "kv:create": "wrangler kv namespace create LEADERBOARD_KV",
+    "copilot:sync": "node scripts/sync-copilot-usage.mjs",
     "migrate:export": "node scripts/migrate-to-pg.mjs export --from https://leaderboard.magizhan.work",
     "migrate:import": "node scripts/migrate-to-pg.mjs import --db postgresql://localhost:5432/ai_leaderboard",
     "migrate:sync": "node scripts/migrate-to-pg.mjs sync --from https://leaderboard.magizhan.work --db postgresql://localhost:5432/ai_leaderboard"

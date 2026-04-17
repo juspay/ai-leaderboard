@@ -22,6 +22,19 @@ spec:
           envFrom:
             - configMapRef:
                 name: leaderboard-config
+          env:
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: leaderboard-secrets
+                  key: GITHUB_TOKEN
+                  optional: true
+            - name: COPILOT_SYNC_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: leaderboard-secrets
+                  key: COPILOT_SYNC_TOKEN
+                  optional: true
           resources:
             requests:
               cpu: 50m

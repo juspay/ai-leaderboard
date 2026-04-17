@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: leaderboard-copilot-sync
+  namespace: atlas-ai
+spec:
+  schedule: "15 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: copilot-sync
+              image: ghcr.io/juspay/ai-leaderboard:latest
+              imagePullPolicy: Always
+              command: ["node", "scripts/sync-copilot-usage.mjs"]
+              envFrom:
+                - configMapRef:
+                    name: leaderboard-config
+              env:
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: leaderboard-secrets
+                      key: GITHUB_TOKEN
+                      optional: true
