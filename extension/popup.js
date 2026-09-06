@@ -1,7 +1,7 @@
 // ============================================================
 // CONFIG
 // ============================================================
-const DEFAULT_API_BASE = 'https://leaderboard.sso.integ.internal.svc.movingtech.net';
+const DEFAULT_API_BASE = 'https://grid-sbx.ai.juspay.net/claude/usage';
 const ALARM_NAME = 'claude_usage_sync';
 let API_BASE = DEFAULT_API_BASE;
 
@@ -119,7 +119,7 @@ tokenSaveBtn.addEventListener('click', async () => {
           url: API_BASE,
           name: 'leaderboard_token',
           value: token,
-          path: '/',
+          path: (() => { try { return new URL(API_BASE).pathname.replace(/\/$/, '') || '/'; } catch (e) { return '/'; } })(),
           secure: true,
           sameSite: 'lax',
           expirationDate: Math.floor(Date.now() / 1000) + 365 * 24 * 3600,

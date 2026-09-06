@@ -4,8 +4,7 @@
 // ============================================================
 
 const ALARM_NAME = 'claude_usage_sync';
-const DEFAULT_API_BASE = 'https://leaderboard.sso.integ.internal.svc.movingtech.net';
-const LEGACY_API_BASE = 'https://leaderboard.magizhan.work';
+const DEFAULT_API_BASE = 'https://grid-sbx.ai.juspay.net/claude/usage';
 const TOKEN_COOKIE = 'leaderboard_token';
 
 /** Get the configured API base URL */
@@ -14,32 +13,18 @@ async function getApiBase() {
   return stored.api_base || DEFAULT_API_BASE;
 }
 
-function isUsagePush(method, url) {
-  if ((method || 'POST').toUpperCase() !== 'POST') return false;
-  try {
-    return new URL(url).pathname === '/api/usage';
-  } catch (e) {
-    return false;
-  }
-}
-
-function getMirrorUsageTargets(primaryUrl) {
-  const targets = new Set();
-  try {
-    const parsed = new URL(primaryUrl);
-    if (parsed.pathname !== '/api/usage') return [];
-    targets.add(`${DEFAULT_API_BASE}/api/usage`);
-    targets.add(`${LEGACY_API_BASE}/api/usage`);
-    targets.delete(primaryUrl);
-    return Array.from(targets);
-  } catch (e) {
-    return [];
-  }
-}
-
 // ============================================================
 // Auth: Token-based (lifetime token from Pomerium SSO setup)
 // ============================================================
+
+/** Cookie path for the app's mount point — the host may be shared with other apps */
+function cookiePath(apiBase) {
+  try {
+    return new URL(apiBase).pathname.replace(/\/$/, '') || '/';
+  } catch (e) {
+    return '/';
+  }
+}
 
 /** Get stored token from chrome.storage */
 async function getStoredToken() {
@@ -77,7 +62,7 @@ async function verifyAndStore(token) {
           url: apiBase,
           name: 'leaderboard_token',
           value: token,
-          path: '/',
+          path: cookiePath(apiBase),
           secure: true,
           sameSite: 'lax',
           expirationDate: Math.floor(Date.now() / 1000) + 365 * 24 * 3600,
@@ -223,20 +208,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           headers,
           body: msg.body ? JSON.stringify(msg.body) : undefined,
         };
-
-        // For usage sync, also push to the legacy leaderboard in best-effort mode.
-        if (isUsagePush(msg.method, msg.url)) {
-          const mirrorTargets = getMirrorUsageTargets(msg.url);
-          for (const mirrorUrl of mirrorTargets) {
-            fetch(mirrorUrl, fetchOptions)
-              .then((mirrorRes) => {
-                console.log('[Leaderboard BG] mirror usage push:', mirrorUrl, mirrorRes.status);
-              })
-              .catch((mirrorErr) => {
-                console.warn('[Leaderboard BG] mirror usage push failed:', mirrorUrl, mirrorErr.message);
-              });
-          }
-        }
 
         const res = await fetch(msg.url, fetchOptions);
 

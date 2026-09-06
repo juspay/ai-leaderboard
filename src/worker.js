@@ -31,9 +31,7 @@ export default {
     const path = url.pathname;
 
     const ALLOWED_ORIGINS = [
-      'https://leaderboard.magizhan.work',
-      'https://leaderboard.sso.integ.internal.svc.movingtech.net',
-      'https://claude-leaderboard.mags-814.workers.dev',
+      'https://leaderboard-sbx.ai.juspay.net',
       'https://claude.ai',
     ];
     const origin = request.headers.get('Origin') || '';

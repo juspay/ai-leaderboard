@@ -6,7 +6,7 @@
  *
  * Usage:
  *   API_BASE=http://localhost:8787 npm test     # local dev
- *   API_BASE=https://leaderboard.magizhan.work npm test  # production (needs auth)
+ *   API_BASE=https://grid-sbx.ai.juspay.net/claude/usage npm test  # deployed (needs auth)
  */
 
 const API_BASE = process.env.API_BASE || 'http://localhost:8787';
