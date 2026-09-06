@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: leaderboard-backup
+  namespace: litellm
+  labels:
+    app: leaderboard
+spec:
+  # 02:30 UTC daily. This is the only environment, and the PVC holds data that
+  # cannot be rebuilt: claude.ai only ever exposes current percentages, so lost
+  # history is lost for good.
+  schedule: "30 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          # ReadWriteOnce means the disk is attached to exactly one node. This
+          # job can only mount it if it lands on the node already running the
+          # app pod — without this affinity it sits in Pending forever.
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app: leaderboard
+                  topologyKey: kubernetes.io/hostname
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+            - name: backup
+              image: google/cloud-sdk:alpine
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+                  apk add --no-cache sqlite >/dev/null
+                  STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+                  OUT=/tmp/leaderboard-${STAMP}.db
+                  # .backup, not cp: takes a consistent snapshot of a live
+                  # database instead of copying a file mid-write.
+                  sqlite3 /data/leaderboard.db ".backup '${OUT}'"
+                  gzip "${OUT}"
+                  gsutil cp "${OUT}.gz" "gs://${BACKUP_BUCKET}/leaderboard/"
+                  echo "uploaded ${OUT}.gz to gs://${BACKUP_BUCKET}/leaderboard/"
+              env:
+                - name: BACKUP_BUCKET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: leaderboard-config
+                      key: BACKUP_BUCKET
+                      optional: true
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                  readOnly: true
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: leaderboard-data
+                readOnly: true
