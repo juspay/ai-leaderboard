@@ -11,7 +11,7 @@ COPY src/ src/
 COPY public/ public/
 
 # SQLite lives on a mounted volume; see k8s/app/pvc.yaml.
-ENV DB_PATH=/data/leaderboard.db
+ENV CLAUDE_DB_PATH=/data/leaderboard.db
 RUN mkdir -p /data && chown -R node:node /data /app
 
 USER node

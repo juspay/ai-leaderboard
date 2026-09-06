@@ -45,7 +45,11 @@ docker run --rm --network host -v "$PWD/test:/test:ro" \
   can impersonate any user.
 - **`POST /api/usage` must bypass SSO** at the proxy. The extension authenticates it with a
   bearer token instead. Behind SSO it silently 302s to a login page and syncs vanish.
-- **`BASE_PATH`** — the app is mounted at `/claude/usage` on a host shared with grid. `server.js`
+- **Config is `CLAUDE_`-prefixed** (`CLAUDE_BASE_PATH`, `CLAUDE_DB_PATH`,
+  `CLAUDE_PLAN_COST`, `CLAUDE_BACKUP_BUCKET`) because it lives in `app-config`, a
+  ConfigMap shared with grid and managed via InfraSwitch, not `kubectl`. See
+  `k8s/configmaps/README.md`.
+- **`CLAUDE_BASE_PATH`** — the app is mounted at `/claude/usage` on a host shared with grid. `server.js`
   strips the prefix itself, so it works whether or not the ingress rewrites. Frontend asset refs
   must stay **relative**, and `API_BASE` is derived from `new URL('.', location.href)`.
 

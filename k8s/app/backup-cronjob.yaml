@@ -47,14 +47,14 @@ spec:
                   # database instead of copying a file mid-write.
                   sqlite3 /data/leaderboard.db ".backup '${OUT}'"
                   gzip "${OUT}"
-                  gsutil cp "${OUT}.gz" "gs://${BACKUP_BUCKET}/leaderboard/"
-                  echo "uploaded ${OUT}.gz to gs://${BACKUP_BUCKET}/leaderboard/"
+                  gsutil cp "${OUT}.gz" "gs://${CLAUDE_BACKUP_BUCKET}/leaderboard/"
+                  echo "uploaded ${OUT}.gz to gs://${CLAUDE_BACKUP_BUCKET}/leaderboard/"
               env:
-                - name: BACKUP_BUCKET
+                - name: CLAUDE_BACKUP_BUCKET
                   valueFrom:
                     configMapKeyRef:
-                      name: leaderboard-config
-                      key: BACKUP_BUCKET
+                      name: app-config
+                      key: CLAUDE_BACKUP_BUCKET
                       optional: true
               volumeMounts:
                 - name: data

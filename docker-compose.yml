@@ -5,8 +5,8 @@ services:
       - "${APP_PORT:-3000}:3000"
     environment:
       - PORT=3000
-      - DB_PATH=/data/leaderboard.db
-      - PLAN_COST=200
+      - CLAUDE_DB_PATH=/data/leaderboard.db
+      - CLAUDE_PLAN_COST=200
     volumes:
       - app-data:/data
 

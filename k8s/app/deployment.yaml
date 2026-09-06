@@ -37,9 +37,24 @@ spec:
             - containerPort: 3000
               name: http
               protocol: TCP
-          envFrom:
-            - configMapRef:
-                name: leaderboard-config
+          # Named keys rather than envFrom: app-config is shared with grid and
+          # every other LITELLM product, so envFrom would inject ~32 unrelated
+          # variables into this container.
+          env:
+            # Deployment-coupled, not tunable: this path only makes sense
+            # alongside the volumeMount below, so it stays out of shared config.
+            - name: CLAUDE_DB_PATH
+              value: /data/leaderboard.db
+            - name: CLAUDE_BASE_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: CLAUDE_BASE_PATH
+            - name: CLAUDE_PLAN_COST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: CLAUDE_PLAN_COST
           volumeMounts:
             - name: data
               mountPath: /data

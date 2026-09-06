@@ -8,8 +8,10 @@ import worker from './worker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
+// CLAUDE_-prefixed because these land in `app-config`, a ConfigMap shared with
+// grid and every other LITELLM product on the cluster.
 // In the cluster this points inside the mounted PVC (see k8s/app/pvc.yaml).
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'leaderboard.db');
+const DB_PATH = process.env.CLAUDE_DB_PATH || path.join(__dirname, '..', 'data', 'leaderboard.db');
 
 // Open the database then bring the schema up to date
 const kv = createSqliteKV(DB_PATH);
@@ -21,7 +23,9 @@ const auth = createAuthManager(kv._db);
 
 const env = {
   LEADERBOARD_KV: kv,
-  PLAN_COST: process.env.PLAN_COST || '200',
+  // Mapped onto the bare name worker.js reads, so the shared Worker code stays
+  // unaware of the deployment's naming convention.
+  PLAN_COST: process.env.CLAUDE_PLAN_COST || '200',
   CF_ACCESS_AUD: process.env.CF_ACCESS_AUD || '',       // empty = skip auth
   CF_ACCESS_TEAM_DOMAIN: process.env.CF_ACCESS_TEAM_DOMAIN || '',
 };
@@ -35,14 +39,16 @@ app.use(express.json({ limit: '5mb' }));
 
 /**
  * When the app is mounted under a prefix on a shared host — e.g.
- * https://grid-sbx.ai.juspay.net/claude/usage — set BASE_PATH=/claude/usage.
+ * https://grid-sbx.ai.juspay.net/claude/usage — set
+ * CLAUDE_BASE_PATH=/claude/usage.
  *
  * The prefix is stripped here rather than assumed to be stripped by the proxy,
  * so the app serves correctly whether or not the ingress rewrites the path.
- * Everything downstream (static files, API routes, the worker handler) keeps
- * seeing plain /api/... and /index.html and needs no prefix awareness.
+ * That is not optional on this cluster: litellm-ingress is a GCE ingress, which
+ * has no path rewriting at all. Everything downstream (static files, API routes,
+ * the worker handler) keeps seeing plain /api/... and needs no prefix awareness.
  */
-const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/+$/, '');
+const BASE_PATH = (process.env.CLAUDE_BASE_PATH || '').replace(/\/+$/, '');
 
 if (BASE_PATH) {
   app.use((req, res, next) => {
