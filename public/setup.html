@@ -180,11 +180,22 @@
 
   <!-- NO SSO SCREEN: fallback when Pomerium headers missing -->
   <div id="noSsoScreen" class="hidden">
-    <div class="status error">Could not detect SSO identity. If you already have a token, enter it below.</div>
+    <div class="status">Enter your work email to get your sync token.</div>
     <div class="token-input-row">
-      <input type="text" id="manualTokenInput" placeholder="Paste your token here">
-      <button id="manualTokenBtn">Verify</button>
+      <input type="email" id="declaredEmailInput" placeholder="you@juspay.in" autocomplete="email">
+      <button id="declaredEmailBtn">Continue</button>
     </div>
+    <div id="declaredEmailError" class="status error hidden"></div>
+
+    <details style="margin-top:18px;">
+      <summary style="cursor:pointer;color:var(--text-dim,#94a3b8);font-size:0.8rem;">
+        Already have a token? (e.g. setting up a second browser)
+      </summary>
+      <div class="token-input-row" style="margin-top:10px;">
+        <input type="text" id="manualTokenInput" placeholder="Paste your token here">
+        <button id="manualTokenBtn">Verify</button>
+      </div>
+    </details>
   </div>
 </div>
 
@@ -246,35 +257,78 @@ function showTokenScreen(token, label, showChangeBtn = false) {
 // Init
 // ============================================================
 async function init() {
-  // Step 1: Check identity (server reads token cookie + Pomerium headers)
+  // Step 1: Check identity (server reads token cookie + proxy SSO headers)
   const meRes = await fetch(API_BASE + '/api/me');
-  if (!meRes.ok) {
-    // No auth at all — show manual token input
-    document.getElementById('emailBadge').textContent = 'Not signed in';
-    document.getElementById('noSsoScreen').classList.remove('hidden');
-    initManualTokenEntry();
-    return;
+  if (meRes.ok) {
+    const me = await meRes.json();
+    document.getElementById('emailBadge').textContent = me.email;
+    return continueSetup();
   }
-  const me = await meRes.json();
-  document.getElementById('emailBadge').textContent = me.email;
 
-  // Step 2: Get or create token, check if already linked to a user
+  // No proxy identity — ask the user to declare their email instead.
+  document.getElementById('emailBadge').textContent = 'Not signed in';
+  document.getElementById('noSsoScreen').classList.remove('hidden');
+  initDeclaredEmail();
+  initManualTokenEntry();
+}
+
+/**
+ * Step 2/3: mint or fetch the token, then either show it or pick a user.
+ * declaredEmail is only sent when no proxy vouched for the identity.
+ */
+async function continueSetup(declaredEmail) {
   const setupRes = await fetch(API_BASE + '/api/auth/setup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
+    body: JSON.stringify(declaredEmail ? { email: declaredEmail } : {}),
   });
   const setupData = await setupRes.json();
+  if (!setupRes.ok || !setupData.token) {
+    throw new Error(setupData.error || 'Could not create a token.');
+  }
 
-  if (setupData.token && setupData.userId) {
+  // Set the cookie before anything else: without a proxy header, the calls
+  // that follow (/api/auth/unclaimed-users) authenticate with this token.
+  setCookie(setupData.token);
+  document.getElementById('emailBadge').textContent = setupData.email;
+
+  if (setupData.userId) {
     // Already mapped — show token screen with change option
     showTokenScreen(setupData.token, 'Linked to: ' + (setupData.userName || setupData.userId), true);
     return;
   }
 
-  // Step 3: Has token but no user mapping — show user picker
+  // Has token but no user mapping — show user picker
+  document.getElementById('noSsoScreen').classList.add('hidden');
   document.getElementById('setupScreen').classList.remove('hidden');
   initUserPicker();
+}
+
+// ============================================================
+// Self-declared email (no SSO proxy in front)
+// ============================================================
+function initDeclaredEmail() {
+  const btn = document.getElementById('declaredEmailBtn');
+  const input = document.getElementById('declaredEmailInput');
+  const err = document.getElementById('declaredEmailError');
+
+  async function submit() {
+    const email = input.value.trim();
+    if (!email) return;
+    err.classList.add('hidden');
+    btn.disabled = true;
+    try {
+      await continueSetup(email);
+    } catch (e) {
+      err.textContent = e.message;
+      err.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  btn.addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
 }
 
 // ============================================================

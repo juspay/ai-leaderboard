@@ -109,6 +109,26 @@ function getPomeriumIdentity(req) {
   return { email, groups, user };
 }
 
+const ALLOWED_EMAIL_DOMAINS = ['juspay.in', 'nammayatri.in'];
+
+/**
+ * Normalize a self-declared email from the setup page.
+ *
+ * This is NOT authentication — nothing verifies the claim, and that is a
+ * deliberate trade-off while no auth proxy sits in front of the app. The check
+ * only keeps typos and junk out of the auth_tokens table. When IAP or a similar
+ * proxy is added, the header path in resolveAuth takes precedence over this and
+ * self-declared emails stop being reachable.
+ */
+function normalizeDeclaredEmail(raw) {
+  if (typeof raw !== 'string') return null;
+  const email = raw.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  const domain = email.split('@')[1];
+  if (!ALLOWED_EMAIL_DOMAINS.includes(domain)) return null;
+  return email;
+}
+
 /**
  * Resolve the current user's identity from any available auth source.
  * Tries token first (covers browser cookie + extension header), then Pomerium.
@@ -149,11 +169,19 @@ app.get('/api/me', async (req, res) => {
 // Requires auth (Pomerium for first-time, token for returning users)
 app.post('/api/auth/setup', async (req, res) => {
   const identity = await resolveAuth(req);
-  if (!identity) return res.status(401).json({ error: 'Authentication required.' });
+
+  // Prefer a proxy-asserted identity; fall back to one the caller declares.
+  // Order matters: adding IAP later makes the header win automatically.
+  const email = identity?.email || normalizeDeclaredEmail(req.body?.email);
+  if (!email) {
+    return res.status(400).json({
+      error: `A valid @${ALLOWED_EMAIL_DOMAINS.join(' or @')} email is required.`,
+    });
+  }
 
   try {
     // If already authed via token, use that record; otherwise create one from email
-    let record = identity.record || auth.getOrCreateToken(identity.email);
+    let record = identity?.record || auth.getOrCreateToken(email);
 
     const { userId, newUserName, newUserTeam } = req.body || {};
 
