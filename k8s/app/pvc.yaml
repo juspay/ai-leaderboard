@@ -6,10 +6,14 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  # Pinned rather than left to the cluster default, so the manifest keeps
+  # meaning the same thing if that default ever changes. standard-rwo is
+  # pd-balanced via the CSI driver, and allows volume expansion.
+  storageClassName: standard-rwo
   resources:
     requests:
-      # The dataset is bounded: MAX_HISTORY=500 and MAX_WEEKLY=52 in
-      # src/helpers.js cap it at ~76 KB per user, so 100 users is under 10 MB.
-      # 10Gi is requested because GCP PD has a floor around there anyway and a
-      # PVC can be expanded but never shrunk. Leaves room for WAL + local dumps.
-      storage: 10Gi
+      # Far more than needed: the dataset is bounded by MAX_HISTORY=500 and
+      # MAX_WEEKLY=52 in src/helpers.js at ~76 KB per user, so 100 users is
+      # under 10 MB. Sized for headroom because expansion is possible but
+      # shrinking never is.
+      storage: 20Gi
