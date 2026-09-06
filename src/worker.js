@@ -31,7 +31,7 @@ export default {
     const path = url.pathname;
 
     const ALLOWED_ORIGINS = [
-      'https://leaderboard-sbx.ai.juspay.net',
+      'https://grid-sbx.ai.juspay.net',
       'https://claude.ai',
     ];
     const origin = request.headers.get('Origin') || '';
