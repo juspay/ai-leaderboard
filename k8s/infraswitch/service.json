@@ -1,0 +1,35 @@
+{
+   "apiVersion": "v1",
+   "kind": "Service",
+   "metadata": {
+      "labels": {
+         "app": "{{service_name}}",
+         "tier": "app",
+         "version": "{{version}}"
+      },
+      "name": "{{service_name}}",
+      "namespace": "{{namespace}}"
+   },
+   "spec": {
+      "allocateLoadBalancerNodePorts": null,
+      "clusterIP": null,
+      "clusterIPs": null,
+      "externalTrafficPolicy": null,
+      "healthCheckNodePort": null,
+      "internalTrafficPolicy": null,
+      "ipFamilies": null,
+      "ipFamilyPolicy": "SingleStack",
+      "loadBalancerSourceRanges": null,
+      "ports": [
+         {
+            "name": "http",
+            "port": 3000,
+            "protocol": "TCP",
+            "targetPort": 3000
+         }
+      ],
+      "selector": {},
+      "sessionAffinity": "None",
+      "type": "NodePort"
+   }
+}

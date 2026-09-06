@@ -7,10 +7,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: leaderboard
+  name: claude-leaderboard
   namespace: litellm
   labels:
-    app: leaderboard
+    app: claude-leaderboard
 spec:
   replicas: 1
   # Recreate, NOT RollingUpdate. The PVC is ReadWriteOnce and SQLite tolerates
@@ -23,11 +23,11 @@ spec:
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app: leaderboard
+      app: claude-leaderboard
   template:
     metadata:
       labels:
-        app: leaderboard
+        app: claude-leaderboard
     spec:
       securityContext:
         # node:20-slim's built-in `node` user. fsGroup makes the mounted volume
@@ -36,7 +36,7 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
       containers:
-        - name: leaderboard
+        - name: claude-leaderboard
           image: gcr.io/xyne-dev-461113/ai-leaderboard:latest # overwritten per deploy with the commit SHA
           imagePullPolicy: Always
           ports:
