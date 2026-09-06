@@ -1,0 +1,43 @@
+# Path rule to add to the EXISTING shared ingress.
+#
+# grid-sbx.ai.juspay.net is served by `litellm-ingress` in namespace litellm,
+# which several apps share (grid, evals, logs, litellm itself). Do NOT create a
+# second Ingress for this host — GCE would provision another load balancer with
+# a different IP and the managed certificate would not cover it.
+#
+# Apply with:
+#   kubectl -n litellm patch ingress litellm-ingress --type=json \
+#     --patch-file k8s/ingress-patch.yaml
+#
+# Apply the app itself FIRST and wait for the pod to be Ready. A GCE ingress
+# health-checks the backend before serving it; adding the rule while no healthy
+# pod exists puts the backend in an UNHEALTHY state that takes minutes to clear.
+#
+# Path collision check against the rules already on this host:
+#   /api        -> grid-ai-backend          (grid's API — NOT ours)
+#   /dashboard  -> grid-ai-frontend
+#   /logs       -> log-analysis-sandbox
+#   /evals/api  -> xyne-eval-ops-dashboard-backend
+#   /evals      -> xyne-eval-ops-dashboard-frontend
+#   /           -> juspay-litellm            (catch-all)
+# Ours is /claude/usage. GCE matches on the longest prefix, so it wins over the
+# "/" catch-all, and it never reaches grid's "/api" rule because our API lives
+# at /claude/usage/api/... — a different first segment.
+#
+# One rule, not two: unlike /evals + /evals/api, this app serves its frontend
+# and its API from a single container, so the whole prefix goes to one backend.
+#
+# Index 0 places the rule before the "/" catch-all. Ordering is not what makes
+# it win (longest-prefix does), but keeping specific rules above the catch-all
+# matches how the existing list is written.
+
+- op: add
+  path: /spec/rules/0/http/paths/0
+  value:
+    path: /claude/usage
+    pathType: Prefix
+    backend:
+      service:
+        name: leaderboard
+        port:
+          number: 80

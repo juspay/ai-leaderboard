@@ -9,14 +9,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * Every migration must be idempotent (use IF NOT EXISTS, etc.)
  * so re-running is always safe.
  */
-export async function runMigrations(pool) {
+export function runMigrations(db) {
   const files = readdirSync(__dirname)
     .filter(f => f.endsWith('.sql'))
     .sort();
 
   for (const file of files) {
     const sql = readFileSync(path.join(__dirname, file), 'utf-8');
-    await pool.query(sql);
+    db.exec(sql); // exec (not prepare) — each file holds several statements
     console.log(`  migration: ${file}`);
   }
 }

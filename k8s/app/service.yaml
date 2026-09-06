@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: leaderboard
+  namespace: litellm
+  labels:
+    app: leaderboard
+  annotations:
+    # litellm-ingress is a GCE ingress using container-native load balancing
+    # (its existing backends are all k8s1-… NEGs). Declaring this explicitly
+    # keeps the Service from silently falling back to instance groups.
+    cloud.google.com/neg: '{"ingress": true}'
+spec:
+  # ClusterIP is enough — the GCE load balancer reaches pods directly through
+  # the NEG, so no NodePort is required.
+  #
+  # NOTE: this does NOT make the app private. The load balancer is
+  # internet-facing and there is no auth proxy in front of it, so the pod is
+  # reachable from the internet the moment the ingress rule lands. See the
+  # header-trust problem in server.js:getPomeriumIdentity before exposing it.
+  type: ClusterIP
+  selector:
+    app: leaderboard
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+      name: http

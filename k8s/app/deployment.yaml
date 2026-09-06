@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: leaderboard
+  namespace: litellm
+  labels:
+    app: leaderboard
+spec:
+  replicas: 1
+  # Recreate, NOT RollingUpdate. The PVC is ReadWriteOnce and SQLite tolerates
+  # exactly one writer. A rolling update would start the new pod before the old
+  # one terminates, and the two would fight over the same volume — either a
+  # multi-attach error, or two processes writing one database file.
+  # Cost: a few seconds of downtime per deploy. Accepted deliberately.
+  strategy:
+    type: Recreate
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: leaderboard
+  template:
+    metadata:
+      labels:
+        app: leaderboard
+    spec:
+      securityContext:
+        # node:20-slim's built-in `node` user. fsGroup makes the mounted volume
+        # group-writable so the non-root process can create the database file.
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: leaderboard
+          image: gcr.io/xyne-dev-461113/ai-leaderboard:latest # overwritten per deploy with the commit SHA
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: leaderboard-config
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /api/data
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/data
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: leaderboard-data
+      terminationGracePeriodSeconds: 30

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: leaderboard-data
+  namespace: litellm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # The dataset is bounded: MAX_HISTORY=500 and MAX_WEEKLY=52 in
+      # src/helpers.js cap it at ~76 KB per user, so 100 users is under 10 MB.
+      # 10Gi is requested because GCP PD has a floor around there anyway and a
+      # PVC can be expanded but never shrunk. Leaves room for WAL + local dumps.
+      storage: 10Gi

@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Claude Usage Leaderboard Sync
-// @namespace    https://leaderboard.magizhan.work
+// @namespace    https://grid-sbx.ai.juspay.net/claude/usage
 // @version      1.4
 // @description  Auto-syncs your Claude AI usage to the team leaderboard
 // @author       Mags
@@ -10,16 +10,16 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
-// @connect      leaderboard.magizhan.work
-// @updateURL    https://leaderboard.magizhan.work/claude-leaderboard.user.js
-// @downloadURL  https://leaderboard.magizhan.work/claude-leaderboard.user.js
+// @connect      grid-sbx.ai.juspay.net
+// @updateURL    https://grid-sbx.ai.juspay.net/claude/usage/claude-leaderboard.user.js
+// @downloadURL  https://grid-sbx.ai.juspay.net/claude/usage/claude-leaderboard.user.js
 // @run-at       document-idle
 // ==/UserScript==
 
 (function() {
   'use strict';
 
-  const API_BASE = 'https://leaderboard.magizhan.work';
+  const API_BASE = 'https://grid-sbx.ai.juspay.net/claude/usage';
   const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
   // ============================================================
