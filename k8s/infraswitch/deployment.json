@@ -1,0 +1,138 @@
+{
+   "apiVersion": "apps/v1",
+   "kind": "Deployment",
+   "metadata": {
+      "labels": {
+         "app": "claude-leaderboard",
+         "tier": "backend"
+      },
+      "name": "claude-leaderboard",
+      "namespace": "litellm"
+   },
+   "spec": {
+      "replicas": 1,
+      "selector": {
+         "matchLabels": {
+            "app": "claude-leaderboard"
+         }
+      },
+      "strategy": {
+         "type": "Recreate"
+      },
+      "template": {
+         "metadata": {
+            "annotations": {},
+            "labels": {
+               "app": "claude-leaderboard",
+               "tier": "backend"
+            }
+         },
+         "spec": {
+            "containers": [
+               {
+                  "env": [
+                     {
+                        "name": "CLAUDE_DB_PATH",
+                        "valueFrom": {
+                           "configMapKeyRef": {
+                              "key": "CLAUDE_DB_PATH",
+                              "name": "app-config"
+                           }
+                        }
+                     },
+                     {
+                        "name": "CLAUDE_BASE_PATH",
+                        "valueFrom": {
+                           "configMapKeyRef": {
+                              "key": "CLAUDE_BASE_PATH",
+                              "name": "app-config"
+                           }
+                        }
+                     },
+                     {
+                        "name": "CLAUDE_PLAN_COST",
+                        "valueFrom": {
+                           "configMapKeyRef": {
+                              "key": "CLAUDE_PLAN_COST",
+                              "name": "app-config"
+                           }
+                        }
+                     }
+                  ],
+                  "image": "{{image_repository}}:{{image_tag}}",
+                  "imagePullPolicy": "Always",
+                  "name": "claude-leaderboard",
+                  "ports": [
+                     {
+                        "containerPort": 8420,
+                        "name": "http",
+                        "protocol": "TCP"
+                     }
+                  ],
+                  "readinessProbe": {
+                     "failureThreshold": 3,
+                     "httpGet": {
+                        "path": "/api/data",
+                        "port": 8420,
+                        "scheme": "HTTP"
+                     },
+                     "initialDelaySeconds": 5,
+                     "periodSeconds": 10,
+                     "successThreshold": 1,
+                     "timeoutSeconds": 3
+                  },
+                  "livenessProbe": {
+                     "failureThreshold": 3,
+                     "httpGet": {
+                        "path": "/api/data",
+                        "port": 8420,
+                        "scheme": "HTTP"
+                     },
+                     "initialDelaySeconds": 15,
+                     "periodSeconds": 30,
+                     "successThreshold": 1,
+                     "timeoutSeconds": 5
+                  },
+                  "resources": {
+                     "limits": {
+                        "cpu": "500m",
+                        "memory": "512Mi"
+                     },
+                     "requests": {
+                        "cpu": "50m",
+                        "memory": "128Mi"
+                     }
+                  },
+                  "securityContext": {
+                     "allowPrivilegeEscalation": false,
+                     "readOnlyRootFilesystem": false,
+                     "runAsNonRoot": true,
+                     "runAsUser": 1001
+                  },
+                  "volumeMounts": [
+                     {
+                        "mountPath": "/data",
+                        "name": "data"
+                     }
+                  ]
+               }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {
+               "fsGroup": 1001
+            },
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+               {
+                  "name": "data",
+                  "persistentVolumeClaim": {
+                     "claimName": "leaderboard-data"
+                  }
+               }
+            ]
+         }
+      }
+   }
+}

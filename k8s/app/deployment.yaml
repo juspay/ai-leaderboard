@@ -30,11 +30,12 @@ spec:
         app: claude-leaderboard
     spec:
       securityContext:
-        # node:20-slim's built-in `node` user. fsGroup makes the mounted volume
-        # group-writable so the non-root process can create the database file.
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
+        # 1001 matches InfraSwitch's deployment convention; the Dockerfile
+        # chowns /app and /data to the same uid. fsGroup makes the mounted
+        # volume group-writable so the non-root process can create the database.
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       containers:
         - name: claude-leaderboard
           image: gcr.io/xyne-dev-461113/ai-leaderboard:latest # overwritten per deploy with the commit SHA
