@@ -1,22 +1,23 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createPgKV } from './pg-kv.js';
+import { createSqliteKV } from './sqlite-kv.js';
 import { createAuthManager } from './auth-tokens.js';
 import { runMigrations } from './migrations/run.js';
 import worker from './worker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://localhost:5432/ai_leaderboard';
+// In the cluster this points inside the mounted PVC (see k8s/app/pvc.yaml).
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'leaderboard.db');
 
-// Run migrations then create KV adapter
-const kv = await createPgKV(DATABASE_URL);
+// Open the database then bring the schema up to date
+const kv = createSqliteKV(DB_PATH);
 console.log('Running migrations...');
-await runMigrations(kv._pool);
-console.log('Connected to PostgreSQL');
+runMigrations(kv._db);
+console.log(`Connected to SQLite at ${DB_PATH}`);
 
-const auth = createAuthManager(kv._pool);
+const auth = createAuthManager(kv._db);
 
 const env = {
   LEADERBOARD_KV: kv,
@@ -95,7 +96,7 @@ async function resolveAuth(req) {
   // 1. Token auth (header, query, or cookie)
   const token = extractToken(req);
   if (token) {
-    const record = await auth.getByToken(token);
+    const record = auth.getByToken(token);
     if (record) return { email: record.email, record, source: 'token' };
     // Invalid token — don't fall through to Pomerium (avoids confused deputy)
     return null;
@@ -127,12 +128,12 @@ app.post('/api/auth/setup', async (req, res) => {
 
   try {
     // If already authed via token, use that record; otherwise create one from email
-    let record = identity.record || await auth.getOrCreateToken(identity.email);
+    let record = identity.record || auth.getOrCreateToken(identity.email);
 
     const { userId, newUserName, newUserTeam } = req.body || {};
 
     if (userId) {
-      const result = await auth.claimUser(record.token, userId);
+      const result = auth.claimUser(record.token, userId);
       if (result.error) return res.status(409).json(result);
       record.user_id = userId;
     } else if (newUserName) {
@@ -147,7 +148,7 @@ app.post('/api/auth/setup', async (req, res) => {
       const created = await createRes.json();
       if (created.error) return res.status(createRes.status).json(created);
 
-      const result = await auth.claimUser(record.token, created.id);
+      const result = auth.claimUser(record.token, created.id);
       if (result.error) return res.status(409).json(result);
       record.user_id = created.id;
     }
@@ -177,7 +178,7 @@ app.get('/api/auth/verify', async (req, res) => {
   if (!token) return res.status(401).json({ error: 'No token provided.' });
 
   try {
-    const record = await auth.getByToken(token);
+    const record = auth.getByToken(token);
     if (!record) return res.status(401).json({ error: 'Invalid token.' });
     res.json({ email: record.email, userId: record.user_id });
   } catch (err) {
@@ -191,10 +192,10 @@ app.post('/api/auth/unlink', async (req, res) => {
   if (!identity) return res.status(401).json({ error: 'Authentication required.' });
 
   try {
-    const record = identity.record || await auth.getByEmail(identity.email);
+    const record = identity.record || auth.getByEmail(identity.email);
     if (!record) return res.status(404).json({ error: 'No token found for this email.' });
 
-    await kv._pool.query('UPDATE auth_tokens SET user_id = NULL WHERE token = $1', [record.token]);
+    auth.unlinkUser(record.token);
     res.json({ ok: true, email: record.email });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -207,7 +208,7 @@ app.get('/api/auth/whoami', async (req, res) => {
     const identity = await resolveAuth(req);
     if (!identity) return res.json({ userId: null });
 
-    const record = identity.record || await auth.getByEmail(identity.email);
+    const record = identity.record || auth.getByEmail(identity.email);
     if (!record) return res.json({ userId: null, email: identity.email });
 
     if (record.user_id) {
@@ -229,7 +230,7 @@ app.get('/api/auth/unclaimed-users', async (req, res) => {
 
   try {
     const users = await kv.get('users', 'json') || [];
-    const claimed = await auth.getClaimedUserIds();
+    const claimed = auth.getClaimedUserIds();
     const unclaimed = users.filter(u => !claimed.has(u.id));
     res.json(unclaimed);
   } catch (err) {
@@ -245,7 +246,7 @@ app.get('/api/auth/unclaimed-users', async (req, res) => {
 app.use('/api', async (req, res) => {
   try {
     const token = extractToken(req);
-    const record = token ? await auth.getByToken(token) : null;
+    const record = token ? auth.getByToken(token) : null;
 
     // POST /api/usage requires a valid token
     if (req.path === '/usage' && req.method === 'POST') {
@@ -300,7 +301,8 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
   process.on(signal, () => {
     console.log(`\n${signal} received, shutting down...`);
     server.close(() => {
-      kv.quit().then(() => process.exit(0));
+      kv.quit();
+      process.exit(0);
     });
   });
 }

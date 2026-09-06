@@ -2,6 +2,10 @@ node_modules
 .git
 .wrangler
 extension
+data
+k8s
+scripts
+Jenkinsfile
 test
 *.md
 docker-compose.yml
