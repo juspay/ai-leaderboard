@@ -40,7 +40,7 @@ spec:
           image: gcr.io/xyne-dev-461113/ai-leaderboard:latest # overwritten per deploy with the commit SHA
           imagePullPolicy: Always
           ports:
-            - containerPort: 3000
+            - containerPort: 8420
               name: http
               protocol: TCP
           # Every value comes from app-config. InfraSwitch owns this
@@ -72,7 +72,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /api/data
-              port: 3000
+              port: 8420
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3
@@ -80,7 +80,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /api/data
-              port: 3000
+              port: 8420
             initialDelaySeconds: 15
             periodSeconds: 30
             timeoutSeconds: 5

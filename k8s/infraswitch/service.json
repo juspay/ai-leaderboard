@@ -3,12 +3,10 @@
    "kind": "Service",
    "metadata": {
       "labels": {
-         "app": "{{service_name}}",
-         "tier": "app",
-         "version": "{{version}}"
+         "app": "claude-leaderboard"
       },
-      "name": "{{service_name}}",
-      "namespace": "{{namespace}}"
+      "name": "claude-leaderboard",
+      "namespace": "litellm"
    },
    "spec": {
       "allocateLoadBalancerNodePorts": null,
@@ -23,12 +21,14 @@
       "ports": [
          {
             "name": "http",
-            "port": 3000,
+            "port": 8420,
             "protocol": "TCP",
-            "targetPort": 3000
+            "targetPort": 8420
          }
       ],
-      "selector": {},
+      "selector": {
+         "app": "claude-leaderboard"
+      },
       "sessionAffinity": "None",
       "type": "NodePort"
    }

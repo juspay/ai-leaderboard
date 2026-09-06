@@ -16,6 +16,6 @@ RUN mkdir -p /data && chown -R node:node /data /app
 
 USER node
 
-EXPOSE 3000
+EXPOSE 8420
 
 CMD ["node", "src/server.js"]

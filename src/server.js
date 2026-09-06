@@ -7,7 +7,9 @@ import { runMigrations } from './migrations/run.js';
 import worker from './worker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 3000;
+// 8420 rather than 3000: distinctive in a namespace where several
+// apps already listen on 3000, so logs and ingress backends are unambiguous.
+const PORT = process.env.PORT || 8420;
 // CLAUDE_-prefixed because these land in `app-config`, a ConfigMap shared with
 // grid and every other LITELLM product on the cluster.
 // In the cluster this points inside the mounted PVC (see k8s/app/pvc.yaml).

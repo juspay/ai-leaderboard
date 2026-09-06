@@ -40,4 +40,4 @@
       service:
         name: claude-leaderboard
         port:
-          number: 3000
+          number: 8420

@@ -9,22 +9,23 @@ InfraSwitch owns the Deployment, Service, HPA and ConfigMap for this app on
 
 ## Values to fill in
 
-| Placeholder | Value |
-|---|---|
-| `{{service_name}}` | `claude-leaderboard` |
-| `{{namespace}}` | `litellm` |
-| `{{version}}` | whatever InfraSwitch normally stamps |
+Values are hardcoded rather than templated. Grid's deployed Service shows the
+platform does resolve `{{service_name}}` into `metadata.name`, `labels.app` and
+`selector.app` — but with one service, one namespace and one environment, a
+placeholder only adds a way to get a Service literally named `{{service_name}}`.
+`tier` and `version` are dropped because grid's deployed Service carries neither.
 
 The name matters beyond labelling: `../ingress-patch.yaml` routes
-`/claude/usage` to `claude-leaderboard:3000`, so the two must agree or the
+`/claude/usage` to `claude-leaderboard:8420`, so the two must agree or the
 ingress backend will not resolve.
 
 ## Differences from the grid template
 
-**Port 3000, not 5000.** This app listens on 3000 (`src/server.js`, and the
-`containerPort` in the Deployment). Port equals targetPort, matching how grid
-and every other backend on `litellm-ingress` is wired — the ingress references
-each app's own port rather than 80.
+**Port 8420, not 5000.** Chosen to be distinctive: several apps in this
+namespace already listen on 3000, so a unique port keeps logs, NEG names and
+ingress backends unambiguous. Port equals targetPort, matching how grid and
+every other backend on `litellm-ingress` is wired — the ingress references each
+app's own port rather than 80.
 
 **`tier: app`, not `tier: backend`.** Grid splits into separate frontend and
 backend Services. This app serves its dashboard and its API from one container,

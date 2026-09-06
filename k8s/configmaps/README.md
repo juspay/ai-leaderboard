@@ -46,8 +46,8 @@ The shared Worker code stays unaware of this cluster's conventions.
 
 ## Not needed
 
-- **`PORT`** — the app defaults to 3000 (`src/server.js`), matching
-  `containerPort`.
+- **`PORT`** — the app defaults to 8420 (`src/server.js`), matching
+  `containerPort` and the Service port.
 - **`CF_ACCESS_AUD` / `CF_ACCESS_TEAM_DOMAIN`** — Cloudflare Access is not used
   here. Unset means the worker's JWT check is skipped (`src/auth.js`), which is
   the intended behaviour. Setting them would enable a check that rejects every
