@@ -1,3 +1,9 @@
+# InfraSwitch owns this resource — it is NOT applied with kubectl.
+# Kept here as the spec InfraSwitch must reproduce, and to keep the settings
+# under review in git. Two of them are correctness constraints, not preferences:
+# replicas must stay 1 and the strategy must be Recreate, because SQLite on a
+# ReadWriteOnce disk tolerates exactly one writer. An HPA that can scale past 1
+# will either wedge on a Multi-Attach error or corrupt the database.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,14 +43,19 @@ spec:
             - containerPort: 3000
               name: http
               protocol: TCP
+          # Every value comes from app-config. InfraSwitch owns this
+          # Deployment, so literals written here would not survive a
+          # platform-driven redeploy — the ConfigMap is the only durable lever.
+          #
           # Named keys rather than envFrom: app-config is shared with grid and
           # every other LITELLM product, so envFrom would inject ~32 unrelated
           # variables into this container.
           env:
-            # Deployment-coupled, not tunable: this path only makes sense
-            # alongside the volumeMount below, so it stays out of shared config.
             - name: CLAUDE_DB_PATH
-              value: /data/leaderboard.db
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: CLAUDE_DB_PATH
             - name: CLAUDE_BASE_PATH
               valueFrom:
                 configMapKeyRef:

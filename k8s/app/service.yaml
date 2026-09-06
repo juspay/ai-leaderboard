@@ -1,3 +1,5 @@
+# InfraSwitch owns this resource — it is NOT applied with kubectl.
+# Kept here as the spec InfraSwitch must reproduce.
 apiVersion: v1
 kind: Service
 metadata:
