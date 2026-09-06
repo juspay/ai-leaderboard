@@ -1,4 +1,6 @@
-  const API_BASE = window.location.origin;
+  // Resolves to the directory this page is served from, so the app works
+  // both at the domain root and under a prefix like /claude/usage.
+  const API_BASE = new URL('.', window.location.href).href.replace(/\/$/, '');
   // Config: highlight users on outdated extension versions
   // Set to true once Chrome Web Store v1.8 is published and ready
   const SHOW_OUTDATED_EXTENSION_NUDGE = true;
@@ -83,11 +85,13 @@
       "var p={name:n,team:t,source:'console'};if(pt)p.planType=pt;if(sp!==null)p.sessionPct=sp;if(wp!==null)p.weeklyPct=wp;" +
       "if(sra)p.sessionResetsAt=sra;if(wra)p.weeklyResetsAt=wra;" +
       "if(es!==null)p.extraUsageSpent=es;if(el!==null)p.extraUsageLimit=el;if(ep!==null)p.extraUsagePct=ep;" +
-      "var eps=['https://leaderboard.sso.integ.internal.svc.movingtech.net/api/usage','https://leaderboard.magizhan.work/api/usage'];" +
-      "var pj=JSON.stringify(p),sent=0;" +
-      "for(var i=0;i<eps.length;i++){if(navigator.sendBeacon(eps[i],new Blob([pj],{type:'text/plain'})))sent++;}" +
-      "if(sent>0)alert('Synced to '+sent+'/2 endpoints! '+n+' ('+t+') - Session: '+(sp||'--')+'%, Weekly: '+(wp||'--')+'%');" +
-      "else alert('Sync failed for both endpoints. Please try again.')" +
+      // Endpoint is baked in from wherever this dashboard is served, so the
+      // snippet keeps working if the deployment moves.
+      "var ep='" + API_BASE + "/api/usage';" +
+      "var pj=JSON.stringify(p);" +
+      "if(navigator.sendBeacon(ep,new Blob([pj],{type:'text/plain'})))" +
+      "alert('Synced! '+n+' ('+t+') - Session: '+(sp||'--')+'%, Weekly: '+(wp||'--')+'%');" +
+      "else alert('Sync failed. Please try again.')" +
       "})()";
   }
 

@@ -150,7 +150,7 @@
         <li>Paste this token in the token field and click <code>Save</code></li>
       </ol>
     </div>
-    <a href="/" style="text-decoration:none;"><button class="btn">Go to Dashboard</button></a>
+    <a href="./" style="text-decoration:none;"><button class="btn">Go to Dashboard</button></a>
     <button class="btn btn-danger" id="changeUserBtn" style="display:none;">Change Linked User</button>
   </div>
 
@@ -189,7 +189,9 @@
 </div>
 
 <script>
-const API_BASE = window.location.origin;
+// Resolves to the directory this page is served from, so the app works
+// both at the domain root and under a prefix like /claude/usage.
+const API_BASE = new URL('.', window.location.href).href.replace(/\/$/, '');
 let selectedUserId = null;
 
 // ============================================================
@@ -396,7 +398,11 @@ function initManualTokenEntry() {
 // Helpers
 // ============================================================
 function setCookie(token) {
-  document.cookie = `leaderboard_token=${token}; path=/; max-age=${365 * 24 * 3600}; SameSite=Lax; Secure`;
+  // Scope the cookie to this app's mount point. The host may be shared with
+  // other apps (e.g. grid at the same domain root) — a path=/ cookie would be
+  // sent to them on every request.
+  const COOKIE_PATH = new URL('.', window.location.href).pathname.replace(/\/$/, '') || '/';
+  document.cookie = `leaderboard_token=${token}; path=${COOKIE_PATH}; max-age=${365 * 24 * 3600}; SameSite=Lax; Secure`;
 }
 
 function esc(s) {

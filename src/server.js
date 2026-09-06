@@ -29,6 +29,31 @@ const env = {
 const app = express();
 app.use(express.json({ limit: '5mb' }));
 
+// ============================================================
+// Base path
+// ============================================================
+
+/**
+ * When the app is mounted under a prefix on a shared host — e.g.
+ * https://grid-sbx.ai.juspay.net/claude/usage — set BASE_PATH=/claude/usage.
+ *
+ * The prefix is stripped here rather than assumed to be stripped by the proxy,
+ * so the app serves correctly whether or not the ingress rewrites the path.
+ * Everything downstream (static files, API routes, the worker handler) keeps
+ * seeing plain /api/... and /index.html and needs no prefix awareness.
+ */
+const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/+$/, '');
+
+if (BASE_PATH) {
+  app.use((req, res, next) => {
+    // Redirect the bare prefix to its trailing-slash form. The frontend uses
+    // relative asset URLs, which only resolve correctly below a directory.
+    if (req.url === BASE_PATH) return res.redirect(301, BASE_PATH + '/');
+    if (req.url.startsWith(BASE_PATH + '/')) req.url = req.url.slice(BASE_PATH.length);
+    next();
+  });
+}
+
 // Serve static files from public/
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -257,8 +282,10 @@ app.use('/api', async (req, res) => {
       return res.status(401).json({ error: 'Invalid token.' });
     }
 
-    // Build a Web API Request from the Express request
-    const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+    // Build a Web API Request from the Express request.
+    // baseUrl + url, not originalUrl: originalUrl still carries BASE_PATH, and
+    // the worker's router matches bare paths like '/api/data'.
+    const url = `${req.protocol}://${req.get('host')}${req.baseUrl}${req.url}`;
     const headers = new Headers();
     for (const [key, val] of Object.entries(req.headers)) {
       if (val) headers.set(key, Array.isArray(val) ? val.join(', ') : val);

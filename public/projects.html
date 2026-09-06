@@ -196,7 +196,7 @@
 <body>
 
 <div class="container">
-  <a href="/" class="back-link">&larr; Back to Leaderboard</a>
+  <a href="./" class="back-link">&larr; Back to Leaderboard</a>
 
   <div class="header">
     <h1>Projects & Strategies</h1>
@@ -327,7 +327,9 @@
 </div>
 
 <script>
-  const API_BASE = window.location.origin;
+  // Resolves to the directory this page is served from, so the app works
+  // both at the domain root and under a prefix like /claude/usage.
+  const API_BASE = new URL('.', window.location.href).href.replace(/\/$/, '');
 
   async function apiFetch(path, options = {}, retries = 2) {
     for (let attempt = 0; attempt <= retries; attempt++) {
